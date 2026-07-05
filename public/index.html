@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daytona Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0b0f19;
+      --bg-surface: #151b2c;
+      --bg-card: #1e2640;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #2e3b62;
+      
+      --color-green: #10b981;
+      --color-red: #f43f5e;
+      --color-gray: #64748b;
+      --color-blue: #3b82f6;
+      
+      --glow-green: rgba(16, 185, 129, 0.15);
+      --glow-red: rgba(244, 63, 94, 0.15);
+      --glow-blue: rgba(59, 130, 246, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.5rem;
+    }
+
+    header {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary {
+      background-color: var(--color-blue);
+      color: var(--text-main);
+      box-shadow: 0 0 12px var(--glow-blue);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      color: var(--text-main);
+      border-color: #475569;
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .btn-danger {
+      background-color: rgba(244, 63, 94, 0.1);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: var(--color-red);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background-color: var(--color-red);
+      color: var(--text-main);
+      box-shadow: 0 0 12px var(--glow-red);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 1.5rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background-color: transparent;
+      transition: background-color 0.3s;
+    }
+
+    .card.status-up::before {
+      background-color: var(--color-green);
+    }
+
+    .card.status-down::before {
+      background-color: var(--color-red);
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: #475569;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .machine-name {
+      font-size: 1.2rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .badge-up {
+      background-color: rgba(16, 185, 129, 0.1);
+      color: var(--color-green);
+      box-shadow: 0 0 10px var(--glow-green) inset;
+    }
+
+    .badge-down {
+      background-color: rgba(244, 63, 94, 0.1);
+      color: var(--color-red);
+      box-shadow: 0 0 10px var(--glow-red) inset;
+    }
+
+    .badge-none {
+      background-color: rgba(148, 163, 184, 0.1);
+      color: var(--color-gray);
+    }
+
+    .card-info {
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      color: var(--text-muted);
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .info-value {
+      font-family: monospace;
+      color: var(--text-main);
+    }
+
+    .ssh-box {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .ssh-text {
+      font-family: monospace;
+      font-size: 0.75rem;
+      overflow-x: auto;
+      white-space: nowrap;
+      color: #60a5fa;
+      flex-grow: 1;
+    }
+
+    .copy-btn {
+      background: none;
+      border: none;
+      padding: 0.25rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .copy-btn:hover {
+      color: var(--text-main);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .card-actions button {
+      flex: 1;
+      justify-content: center;
+    }
+
+    /* Spinner Animation */
+    .spinner {
+      border: 2.5px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      width: 1rem;
+      height: 1rem;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Modal / Alert message */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(1rem);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      font-weight: 500;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Daytona Dashboard</h1>
+    <button id="refresh-btn" class="btn-secondary" onclick="refreshDashboard()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      Refresh Status
+    </button>
+  </header>
+
+  <main class="grid" id="machines-grid">
+    <!-- Machine cards injected here -->
+  </main>
+
+  <div id="toast">Copied to clipboard!</div>
+
+  <script>
+    const grid = document.getElementById('machines-grid');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    async function fetchMachines() {
+      try {
+        const res = await fetch('/api/machines');
+        const json = await res.json();
+        return json.success ? json.data : [];
+      } catch (err) {
+        showToast("Error loading machine statuses");
+        return [];
+      }
+    }
+
+    async function refreshDashboard() {
+      setRefreshing(true);
+      try {
+        // Trigger server refresh first
+        await fetch('/api/machines/refresh', { method: 'POST' });
+        // Retrieve fresh cache
+        const data = await fetchMachines();
+        renderMachines(data);
+      } catch (err) {
+        showToast("Error refreshing statuses");
+      } finally {
+        setRefreshing(false);
+      }
+    }
+
+    function setRefreshing(isRefreshing) {
+      if (isRefreshing) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<div class="spinner"></div> Refreshing...';
+      } else {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg> Refresh Status';
+      }
+    }
+
+    function renderMachines(machines) {
+      grid.innerHTML = '';
+      if (!machines || machines.length === 0) {
+        grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No machines configured in .env file</p>';
+        return;
+      }
+
+      machines.forEach(machine => {
+        const card = document.createElement('div');
+        card.className = `card ${machine.status === 'UP' ? 'status-up' : machine.status === 'DOWN' ? 'status-down' : ''}`;
+        
+        let statusBadge = '';
+        if (machine.status === 'UP') {
+          statusBadge = '<span class="badge badge-up">🟢 UP</span>';
+        } else if (machine.status === 'DOWN') {
+          statusBadge = '<span class="badge badge-down">🔴 DOWN</span>';
+        } else {
+          statusBadge = '<span class="badge badge-none">❌ NONE</span>';
+        }
+
+        let infoContent = '';
+        if (machine.status !== 'NONE') {
+          infoContent = `
+            <div class="info-row"><span>Sandbox ID</span><span class="info-value">${machine.id.slice(0, 8)}</span></div>
+            <div class="info-row"><span>Region</span><span class="info-value">${machine.region || 'default'}</span></div>
+          `;
+        } else {
+          infoContent = `
+            <div class="info-row"><span>Sandbox ID</span><span class="info-value">-</span></div>
+            <div class="info-row"><span>Region</span><span class="info-value">-</span></div>
+          `;
+        }
+
+        let sshContent = '';
+        if (machine.status !== 'NONE') {
+          const cmd = machine.sshCommand || `Fetching command...`;
+          const isDisabled = machine.sshCommand ? '' : 'disabled';
+          sshContent = `
+            <div class="ssh-box">
+              <div class="ssh-text" id="ssh-text-${machine.name}">${cmd}</div>
+              <button class="copy-btn" ${isDisabled} onclick="copySsh('${machine.name}')" title="Copy SSH command">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+          `;
+        }
+
+        let actionsContent = '';
+        if (machine.status === 'NONE') {
+          actionsContent = `
+            <button class="btn-primary" onclick="actionVM('${machine.name}', 'create')">Create VM</button>
+          `;
+        } else if (machine.status === 'UP') {
+          actionsContent = `
+            <button class="btn-secondary" onclick="actionVM('${machine.name}', 'stop')">Stop</button>
+            <button class="btn-danger" onclick="actionVM('${machine.name}', 'delete')">Delete</button>
+          `;
+        } else if (machine.status === 'DOWN') {
+          actionsContent = `
+            <button class="btn-primary" onclick="actionVM('${machine.name}', 'start')">Start</button>
+            <button class="btn-danger" onclick="actionVM('${machine.name}', 'delete')">Delete</button>
+          `;
+        }
+
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="machine-name">${machine.name}</span>
+            ${statusBadge}
+          </div>
+          <div class="card-info">
+            ${infoContent}
+          </div>
+          ${sshContent}
+          <div class="card-actions" id="actions-${machine.name}">
+            ${actionsContent}
+          </div>
+        `;
+        grid.appendChild(card);
+
+        // If VM is active but didn't have an SSH command ready, fetch it asynchronously
+        if (machine.status !== 'NONE' && !machine.sshCommand) {
+          fetchSshCommand(machine.name);
+        }
+      });
+    }
+
+    async function fetchSshCommand(name) {
+      try {
+        const res = await fetch(`/api/machines/${name}/ssh`);
+        const json = await res.json();
+        if (json.success) {
+          const textEl = document.getElementById(`ssh-text-${name}`);
+          if (textEl) {
+            textEl.innerText = json.data.sshCommand;
+            const btnEl = textEl.nextElementSibling;
+            if (btnEl) btnEl.disabled = false;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load SSH command", err);
+      }
+    }
+
+    async function actionVM(name, action) {
+      const actionsDiv = document.getElementById(`actions-${name}`);
+      const oldHtml = actionsDiv.innerHTML;
+      actionsDiv.innerHTML = `<button class="btn-secondary" disabled style="width: 100%;"><div class="spinner"></div> Processing...</button>`;
+      
+      try {
+        let method = 'POST';
+        let url = `/api/machines/${name}/${action}`;
+        
+        if (action === 'delete') {
+          method = 'DELETE';
+          url = `/api/machines/${name}`;
+        }
+        
+        const res = await fetch(url, { method });
+        const json = await res.json();
+        if (json.success) {
+          showToast(`Successfully triggers ${action}`);
+          // Load updated statuses
+          const data = await fetchMachines();
+          renderMachines(data);
+        } else {
+          showToast(`Failed: ${json.error}`);
+          actionsDiv.innerHTML = oldHtml;
+        }
+      } catch (err) {
+        showToast(`Request failed for VM ${name}`);
+        actionsDiv.innerHTML = oldHtml;
+      }
+    }
+
+    function copySsh(name) {
+      const text = document.getElementById(`ssh-text-${name}`).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("SSH Command copied to clipboard!");
+      }).catch(err => {
+        showToast("Failed to copy command");
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.innerText = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    // Initial Load
+    fetchMachines().then(data => renderMachines(data));
+  </script>
+</body>
+</html>
