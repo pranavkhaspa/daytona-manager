@@ -154,7 +154,9 @@ app.post("/api/machines/:name/create", async (req: Request, res: Response) => {
     const sandbox = await daytona.create({
       name,
       snapshot: "daytona-large",
-      autoDeleteInterval: 0,
+      autoStopInterval: 0,
+      autoDeleteInterval: -1,
+      autoArchiveInterval: 0,
     });
 
     // Start VM
@@ -312,6 +314,28 @@ setInterval(async () => {
     }
   }
 }, 23 * 60 * 60 * 1000);
+
+// Auto-restart loop: runs every 5 minutes to ensure all created VMs stay UP 24/7
+setInterval(async () => {
+  console.log("[Auto-Restart] Checking for any stopped VMs...");
+  try {
+    await refreshAll();
+    const stoppedVms = Object.values(cache).filter((info) => info.status === "DOWN");
+    for (const vm of stoppedVms) {
+      if (!vm.sandbox) continue;
+      console.log(`[Auto-Restart] Node '${vm.name}' is DOWN. Auto-starting it...`);
+      try {
+        await vm.sandbox.start();
+        vm.status = "UP";
+        console.log(`[Auto-Restart] Successfully started node '${vm.name}'.`);
+      } catch (err: any) {
+        console.error(`[Auto-Restart] Failed to auto-start node '${vm.name}':`, err.message || err);
+      }
+    }
+  } catch (err: any) {
+    console.error("[Auto-Restart] Error in auto-restart loop:", err.message || err);
+  }
+}, 5 * 60 * 1000);
 
 // Server Initialization
 app.listen(PORT, async () => {

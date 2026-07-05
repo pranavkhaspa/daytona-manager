@@ -57,6 +57,7 @@ function ask(question: string): Promise<string> {
   return new Promise((resolve) => {
     rl.question(question, (answer: string) => {
       rl.close();
+      process.stdin.resume();
       resolve(answer.trim());
     });
   });
@@ -284,7 +285,8 @@ async function handleCreateVM() {
   printBox("CREATE VM", [
     "Creating sandbox...",
     "Snapshot: daytona-large",
-    "Auto Delete: 0"
+    "Auto Stop: 0 (disabled)",
+    "Auto Delete: -1 (disabled)"
   ]);
 
   let sandbox: any;
@@ -292,7 +294,9 @@ async function handleCreateVM() {
     sandbox = await daytona.create({
       name: machineKey,
       snapshot: "daytona-large",
-      autoDeleteInterval: 0,
+      autoStopInterval: 0,
+      autoDeleteInterval: -1,
+      autoArchiveInterval: 0,
     });
   } catch (err: any) {
     printBox("CREATE VM", [
@@ -561,6 +565,38 @@ async function handleStartVM() {
   await promptText("\nPress Enter to continue...");
 }
 
+async function handleStartAllVMs() {
+  const stoppedVms = Object.values(cache).filter((info) => info.status === "DOWN");
+  if (stoppedVms.length === 0) {
+    printBox("START ALL VMS", ["No stopped VMs to start."]);
+    await promptText("\nPress Enter to continue...");
+    return;
+  }
+
+  printBox("START ALL VMS", [
+    `Starting ${stoppedVms.length} VM(s)...`,
+    ...stoppedVms.map(vm => `  • ${vm.name}`)
+  ]);
+
+  const promises = stoppedVms.map(async (vm) => {
+    if (!vm.sandbox) return;
+    try {
+      await vm.sandbox.start();
+      vm.status = "UP";
+    } catch (err: any) {
+      // Ignore or log error in TUI
+    }
+  });
+
+  await Promise.all(promises);
+
+  printBox("START ALL VMS DONE", [
+    `Finished starting ${stoppedVms.length} VM(s).`,
+    "All available nodes are now starting."
+  ]);
+  await promptText("\nPress Enter to continue...");
+}
+
 async function handleStopVM() {
   const runningVms = Object.values(cache).filter((info) => info.status === "UP");
   if (runningVms.length === 0) {
@@ -618,6 +654,7 @@ async function main() {
     "SSH into VM",
     "Regenerate SSH (all)",
     "Start VM",
+    "Start All VMs",
     "Stop VM",
     "Refresh",
     "Exit",
@@ -682,12 +719,15 @@ async function main() {
         await handleStartVM();
         break;
       case 5:
-        await handleStopVM();
+        await handleStartAllVMs();
         break;
       case 6:
-        await refresh();
+        await handleStopVM();
         break;
       case 7:
+        await refresh();
+        break;
+      case 8:
         cleanExit();
     }
   }
