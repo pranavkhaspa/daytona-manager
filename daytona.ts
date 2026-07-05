@@ -296,7 +296,7 @@ async function handleCreateVM() {
       snapshot: "daytona-large",
       autoStopInterval: 0,
       autoDeleteInterval: -1,
-      autoArchiveInterval: 0,
+      autoArchiveInterval: 525600,
     });
   } catch (err: any) {
     printBox("CREATE VM", [

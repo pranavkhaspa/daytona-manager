@@ -3,6 +3,7 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import { Daytona } from "@daytona/sdk";
+import http from "http";
 
 const app = express();
 app.use(express.json());
@@ -156,7 +157,7 @@ app.post("/api/machines/:name/create", async (req: Request, res: Response) => {
       snapshot: "daytona-large",
       autoStopInterval: 0,
       autoDeleteInterval: -1,
-      autoArchiveInterval: 0,
+      autoArchiveInterval: 525600,
     });
 
     // Start VM
@@ -298,6 +299,43 @@ app.post("/api/machines/:name/stop", async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: err.message || err });
   }
 });
+
+// 8. Heartbeat endpoint for self-pings/monitoring
+app.get("/api/heartbeat", (req: Request, res: Response) => {
+  res.json({ success: true, status: "alive", timestamp: new Date().toISOString() });
+});
+
+// Heartbeat loop: runs every 2 minutes to keep the server awake and VMs active
+setInterval(async () => {
+  console.log(`[Heartbeat] Server is alive and active. Time: ${new Date().toISOString()}`);
+  
+  // 1. Self-ping to prevent server sleeping (e.g., on platforms like Render or Heroku)
+  const selfUrl = process.env.SELF_URL || process.env.PING_URL;
+  if (selfUrl) {
+    try {
+      http.get(`${selfUrl}/api/heartbeat`, (res) => {
+        console.log(`[Heartbeat] Self-ping status: ${res.statusCode}`);
+      }).on("error", (err) => {
+        console.error("[Heartbeat] Self-ping error:", err.message);
+      });
+    } catch (err: any) {
+      console.error("[Heartbeat] Self-ping failed:", err.message || err);
+    }
+  }
+
+  // 2. Active VM Heartbeat: Run a lightweight command on each started VM to prevent idle shutdown
+  const activeVms = Object.values(cache).filter((info) => info.status === "UP" && info.sandbox);
+  for (const vm of activeVms) {
+    try {
+      console.log(`[Heartbeat] Sending activity ping to node '${vm.name}'...`);
+      // Query the VM's home directory to generate active workspace traffic on Daytona
+      await vm.sandbox.getUserHomeDir();
+      console.log(`[Heartbeat] Successfully pinged node '${vm.name}'.`);
+    } catch (err: any) {
+      console.error(`[Heartbeat] Failed to ping node '${vm.name}':`, err.message || err);
+    }
+  }
+}, 2 * 60 * 1000);
 
 // 23-Hour Cron to automatically regenerate SSH tokens for all active VMs
 setInterval(async () => {
