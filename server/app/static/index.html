@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daytona Distributed Control Plane</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              900: '#4c1d95',
+            },
+            status: {
+              idle: '#10b981',     # Emerald
+              running: '#f59e0b',  # Amber
+              offline: '#ef4444',  # Red
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 50%, #110e24 0%, #06050b 100%);
+      min-height: 100vh;
+      color: #e2e8f0;
+    }
+    
+    .glass {
+      background: rgba(18, 14, 38, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .glass-interactive:hover {
+      background: rgba(28, 22, 58, 0.7);
+      border-color: rgba(139, 92, 246, 0.3);
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .glow-purple {
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    }
+    
+    .glow-green {
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.25);
+    }
+
+    .glow-amber {
+      box-shadow: 0 0 30px rgba(245, 158, 11, 0.25);
+    }
+    
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(139, 92, 246, 0.3);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(139, 92, 246, 0.5);
+    }
+  </style>
+</head>
+<body class="p-6 font-sans">
+
+  <!-- Header -->
+  <header class="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="p-3 bg-brand-600 rounded-2xl glow-purple text-white">
+        <i data-lucide="cpu" class="w-8 h-8"></i>
+      </div>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+          Daytona <span class="bg-gradient-to-r from-brand-500 to-indigo-400 bg-clip-text text-transparent">Grid</span>
+        </h1>
+        <p class="text-sm text-slate-400">Distributed Compute Cluster & Scheduler Control Plane</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="text-right hidden sm:block">
+        <div class="text-xs text-slate-400">Cluster Status</div>
+        <div class="text-sm font-semibold text-emerald-400 flex items-center gap-1.5 justify-end">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span> Active
+        </div>
+      </div>
+      <button onclick="refreshData()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl flex items-center gap-2 text-sm transition-all duration-200 active:scale-95">
+        <i data-lucide="refresh-cw" class="w-4 h-4" id="refresh-icon"></i> Refresh
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Section: Workers Grid -->
+    <div class="lg:col-span-2 space-y-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-semibold text-white flex items-center gap-2">
+          <i data-lucide="server" class="w-5 h-5 text-brand-500"></i> Cluster Workers
+        </h2>
+        <span id="worker-count" class="px-2.5 py-0.5 bg-brand-900/50 text-brand-100 border border-brand-700/50 rounded-full text-xs font-semibold">0 Workers</span>
+      </div>
+      
+      <!-- Workers Grid Container -->
+      <div id="workers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Loading State -->
+        <div class="col-span-2 py-20 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+          <div class="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+          Loading cluster worker nodes...
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Section: Job Terminal & Queue -->
+    <div class="space-y-6">
+      
+      <!-- Submit Job Terminal -->
+      <div class="glass p-5 rounded-3xl glow-purple">
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <i data-lucide="terminal" class="w-5 h-5 text-brand-500"></i> Submit Compute Job
+        </h2>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1.5 font-medium">Shell Command</label>
+            <input type="text" id="job-command" placeholder='e.g., python3 -c "print(sum(range(1000000)))"' 
+              class="w-full px-4 py-2.5 bg-black/40 border border-white/10 rounded-xl text-sm font-mono text-emerald-400 focus:outline-none focus:border-brand-500 transition-all duration-200">
+          </div>
+          <button onclick="submitJob()" class="w-full py-2.5 bg-brand-600 hover:bg-brand-500 active:scale-[0.98] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 transition-all duration-200">
+            <i data-lucide="play" class="w-4 h-4"></i> Dispatch Job
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Job Logs (Dynamic Card) -->
+      <div id="logs-card" class="glass p-5 rounded-3xl hidden">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-brand-500"></i> Logs: Job #<span id="log-job-id">-</span>
+          </h2>
+          <button onclick="closeLogs()" class="text-slate-400 hover:text-white transition-colors">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <div class="p-3 bg-black/60 rounded-xl border border-white/5">
+          <pre id="log-text" class="text-xs font-mono text-emerald-300 overflow-y-auto max-h-48 whitespace-pre-wrap">Loading logs...</pre>
+        </div>
+      </div>
+
+      <!-- Recent Jobs -->
+      <div class="glass p-5 rounded-3xl">
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <i data-lucide="activity" class="w-5 h-5 text-indigo-400"></i> Job History
+        </h2>
+        <div id="jobs-container" class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+          <!-- Loading Jobs -->
+          <div class="py-10 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+            <div class="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+            Loading history...
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Script logic -->
+  <script>
+    let activeLogPoll = null;
+
+    async function fetchData(url) {
+      try {
+        const res = await fetch(url);
+        return await res.json();
+      } catch (err) {
+        console.error("Fetch error:", err);
+        return null;
+      }
+    }
+
+    async function postData(url, data = {}) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        return await res.json();
+      } catch (err) {
+        console.error("Post error:", err);
+        return null;
+      }
+    }
+
+    async function refreshData() {
+      const refreshIcon = document.getElementById("refresh-icon");
+      refreshIcon.classList.add("animate-spin");
+      
+      await Promise.all([loadWorkers(), loadJobs()]);
+      
+      setTimeout(() => {
+        refreshIcon.classList.remove("animate-spin");
+      }, 500);
+    }
+
+    async function loadWorkers() {
+      const workers = await fetchData('/api/workers');
+      const container = document.getElementById('workers-container');
+      const workerCountBadge = document.getElementById('worker-count');
+      
+      if (!workers) return;
+      
+      workerCountBadge.innerText = `${workers.length} Workers`;
+      
+      if (workers.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-2 py-12 text-center text-slate-400 border border-dashed border-white/10 rounded-2xl">
+            No active workers connected. Run the worker agent to connect.
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = workers.map(w => {
+        let statusColor = "bg-rose-500/20 text-rose-300 border-rose-500/30";
+        let statusBadge = "🔴 Offline";
+        let cardGlow = "";
+        
+        if (w.status === 'idle') {
+          statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+          statusBadge = "🟢 Idle";
+        } else if (w.status === 'running') {
+          statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse";
+          statusBadge = "🟡 Running";
+          cardGlow = "glow-amber";
+        }
+
+        const capabilities = w.capabilities.map(cap => 
+          `<span class="px-2 py-0.5 bg-white/5 border border-white/10 rounded-md text-[10px] uppercase font-mono tracking-wider">${cap}</span>`
+        ).join(' ');
+
+        return `
+          <div class="glass glass-interactive p-5 rounded-2xl transition-all duration-300 flex flex-col justify-between ${cardGlow}">
+            <div class="flex items-start justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider">${w.name}</h3>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${statusColor}">
+                  ${statusBadge}
+                </span>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-slate-400 font-mono">CPU: ${w.cpu} Cores</div>
+                <div class="text-xs text-slate-400 font-mono">RAM: ${w.memory} GB</div>
+              </div>
+            </div>
+            
+            <div class="space-y-3">
+              <div class="flex flex-wrap gap-1.5">${capabilities}</div>
+              
+              <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+                <span class="text-slate-400">Current Job:</span>
+                <span class="font-semibold font-mono text-brand-300">
+                  ${w.current_job_id ? `<button onclick="viewLogs(${w.current_job_id})" class="hover:underline">Job #${w.current_job_id} ➔</button>` : 'None'}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadJobs() {
+      const jobs = await fetchData('/api/jobs');
+      const container = document.getElementById('jobs-container');
+      
+      if (!jobs) return;
+      
+      if (jobs.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-400 text-xs border border-dashed border-white/10 rounded-2xl">
+            No compute jobs submitted yet.
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = jobs.map(j => {
+        let statusBadge = "";
+        if (j.status === 'pending') {
+          statusBadge = `<span class="px-2 py-0.5 bg-slate-500/10 text-slate-400 border border-slate-500/20 text-[10px] font-semibold rounded-md">PENDING</span>`;
+        } else if (j.status === 'running') {
+          statusBadge = `<span class="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-semibold rounded-md animate-pulse">RUNNING</span>`;
+        } else if (j.status === 'completed') {
+          statusBadge = `<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold rounded-md">COMPLETED</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-semibold rounded-md">FAILED</span>`;
+        }
+
+        return `
+          <div onclick="viewLogs(${j.id})" class="p-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-brand-500/30 rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-bold text-white font-mono">#${j.id}</span>
+                ${statusBadge}
+                ${j.worker_name ? `<span class="text-[10px] font-mono text-slate-400 uppercase">${j.worker_name}</span>` : ''}
+              </div>
+              <div class="text-xs font-mono text-slate-300 truncate">${escapeHtml(j.command)}</div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+          </div>
+        `;
+      }).join('');
+      
+      lucide.createIcons();
+    }
+
+    async function submitJob() {
+      const cmdInput = document.getElementById('job-command');
+      const command = cmdInput.value.trim();
+      
+      if (!command) {
+        alert("Please enter a command to execute.");
+        return;
+      }
+      
+      const res = await postData('/api/jobs/submit', { command });
+      if (res && res.status === 'ok') {
+        cmdInput.value = '';
+        await refreshData();
+        viewLogs(res.job_id);
+      }
+    }
+
+    function viewLogs(jobId) {
+      if (activeLogPoll) clearInterval(activeLogPoll);
+      
+      const logsCard = document.getElementById('logs-card');
+      const logJobId = document.getElementById('log-job-id');
+      const logText = document.getElementById('log-text');
+      
+      logsCard.classList.remove('hidden');
+      logJobId.innerText = jobId;
+      logText.innerText = "Loading logs...";
+      
+      const pollLogs = async () => {
+        const job = await fetchData(`/api/jobs/${jobId}`);
+        if (job) {
+          let logStr = job.logs || "";
+          if (job.result) {
+            logStr += `\n\n--- JOB RESULT ---\n${job.result}`;
+          }
+          if (!logStr) {
+            logStr = "Waiting for logs...";
+          }
+          logText.innerText = logStr;
+          logText.scrollTop = logText.scrollHeight;
+          
+          if (job.status === 'completed' || job.status === 'failed') {
+            clearInterval(activeLogPoll);
+            activeLogPoll = null;
+          }
+        }
+      };
+      
+      pollLogs();
+      activeLogPoll = setInterval(pollLogs, 1500);
+    }
+
+    function closeLogs() {
+      if (activeLogPoll) {
+        clearInterval(activeLogPoll);
+        activeLogPoll = null;
+      }
+      document.getElementById('logs-card').classList.add('hidden');
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Initial load
+    refreshData();
+    // Auto refresh every 4 seconds
+    setInterval(refreshData, 4000);
+  </script>
+</body>
+</html>
